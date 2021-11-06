@@ -14,22 +14,38 @@
 ;;     on quark creation.        ;;
 ;; 261 is chance to avoid quark  ;;
 ;;     annihilation * 10.        ;;
+;; 262 is universal expansion    ;;
+;;     * 100.                    ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; 513-768 are for flags.        ;;
 ;; 513 is the upgrade flag.      ;;
 ;;   (unlock at 10 heat)         ;;
 ;; 514 is the beginner flag.     ;;
-;;   (forces annihilation        ;;
-;;    for first five quarks)     ;;
+;;   (hides heat for first       ;;
+;;    five quarks)               ;;
 ;; 515 is hide bought flag.      ;;
 ;;   (hides bought upgrades)     ;;
+;; 516 is the move on flag.      ;;
+;;   (says we're ready to go!)   ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; 769-1024 are for upgrades.    ;;
 ;; 769 is double gain.           ;;
 ;;   (Double quark/heat gain.)   ;;
 ;; 770 is chance increase.       ;;
 ;;   (Increase non-annihilation  ;;
-;;    chance by 5%.)             ;;
+;;    chance to 5%.)             ;;
+;; 771 is expansion increase.    ;;
+;;   (Increase universal         ;;
+;;    expansion to 0.9.)         ;;
+;; 772 is chance increase II.    ;;
+;;   (Increase non-annihilation  ;;
+;;    chance to 20%.)            ;;
+;; 773 is expansion increase II. ;;
+;;   (Increase universal         ;;
+;;    expansion to 0.5.)         ;;
+;; 774 is chance increase III.   ;;
+;;   (Increase non-annihilation  ;;
+;;    chance to 50%.)            ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
@@ -53,12 +69,20 @@
 	push 0
 	store
 
+	push 262 ;; universal expansion
+	push 99
+	store
+
 	push 513 ;; upgrade flag
 	push 1
 	store
 
 	push 514 ;; beginner flag
 	push -5
+	store
+
+	push 516 ;; move on flag
+	push 1
 	store
 
 	push 769 ;; gain upgrade
@@ -69,6 +93,22 @@
 	push 1
 	store
 
+	push 771 ;; expansion upgrade
+	push 1
+	store
+	
+	push 772 ;; chance upgrade II
+	push 1
+	store
+
+	push 773 ;; expansion upgrade II
+	push 1
+	store
+	
+	push 774 ;; chance upgrade III
+	push 1
+	store
+
 ;; Intro
 	push "You are nothing.\n"
 	call print
@@ -76,7 +116,7 @@
 	push "But you could be something.\n"
 	call print
 
-	push "What shall you be?\n"
+	push "Exist. (Type something!)\n"
 	call print
 	push 0 ;; accumulator
 
@@ -99,12 +139,14 @@ loop:
 	swap
 	store ;; RNG seeded.
 	
-	push "So it shall be.\n\n\n"
+	push "And so, you are.\n\n\n"
 	call print
 
 quarks:
 	retrieve 2
-	jz .noeng
+	jz .noheat
+	retrieve 514
+	jn .noheat
 	push "You have "
 	call print
 	retrieve 1
@@ -117,13 +159,17 @@ quarks:
 	printi
 	push " heat.\n"
 	call print
-	push "Universal expansion is causing\n"
+	push "Universal expansion is causing your heat\n"
 	call print
-	push "your heat to be multiplied by 0.99 every turn.\n"
+	push "to be multiplied by 0." 
+	call print
+	retrieve 262
+	printi
+	push " when you create a quark.\n"
 	call print
 	jmp .merge
 
-.noeng:
+.noheat:
 	push "You have "
 	call print
 	retrieve 1
@@ -141,7 +187,37 @@ quarks:
 .upgr:
 	push "Create a (q)uark, or check the (u)pgrades.\n"
 	call print
+	retrieve 770
+	jz .notemoveon
+	jmp .input
 
+.notemoveon:
+	push 49
+	retrieve 1
+	sub ;; 49 - quarks
+	jn .enoughquarks
+	
+	push "***Move on: Have 50 quarks and no heat.***\n"
+	call print
+	jmp .input
+
+.enoughquarks:
+	push 10
+	retrieve 2
+	sub ;; 10 - energy
+	jn .notenoughcool
+	
+	push 516
+	push 0
+	store
+	push "(M)ove on.\n"
+	call print
+	jmp .input
+
+.notenoughcool:
+	push "***Move on: Have 50 quarks and no heat.***\n"
+	call print
+	jmp .input
 
 .input:
 	call safereadc
@@ -157,9 +233,9 @@ quarks:
 	jz createquark
 
 	retrieve 513
-	jz .notdone
-	jmp .finish
-.notdone:	
+	jz .hasupgrades
+	jmp .noupgrades
+.hasupgrades:	
 	dup
 	push 'u'
 	sub
@@ -170,14 +246,48 @@ quarks:
 	sub
 	jz .toupgrades
 
-.finish:
+.noupgrades:
+	retrieve 516
+	jz .canmoveon
 	jmp quarks
+.canmoveon:
+	dup
+	push 'm'
+	sub
+	jz .moveon
+
+	dup
+	push 'M'
+	sub
+	jz .moveon
+
+	jmp quarks
+
+.moveon:
+	push "This is the end of content, for now.\n"
+	call print
+	push "Thanks for playing!\n"
+	call print
+	end
 
 .toupgrades:
 	drop
 	jmp upgrades
 
 upgrades:
+	push "You have "
+	call print
+	retrieve 1
+	printi
+	push " quarks and "
+	call print
+	retrieve 2
+	push 10
+	div
+	printi
+	push " heat.\n"
+	call print
+	
 	push "Current upgrades:\n"
 	call print
 	push 259
@@ -197,15 +307,68 @@ upgrades:
 	jz .b770
 	push -770
 	call .nextup
-	push "Baryon Asymmetry: Your quarks have a chance to avoid annihilation. (0% -> 5%)\n"
+	push "Baryon Asymmetry: Your quarks have a chance to avoid annihilation. (10%)\n"
 	call print
 	push "       25 heat.\n"
 	call print
+	jmp .findisplay
 
 .b770:
+	retrieve 771
+	jz .b771
+	push -771
+	call .nextup
+	push "Cool Down: Universal Expansion is 0.9.\n"
+	call print
+	push "       1 quark.\n"
+	call print
 	
-	
-	push "(0) Return to main.\n"
+.b771:
+	retrieve 772
+	jz .b772
+	;; I'd put a req for 770 here,
+	;; but you can only see this upgrade
+	;; if you bought 770!
+	push -772
+	call .nextup
+	push "Tip the Scales: Baryon Asymmetry is 20%.\n"
+	call print
+	push "       3 quarks, 15 heat.\n"
+	call print
+
+.b772:
+	retrieve 774
+	jz .b774
+	retrieve 772
+	jz .774r
+	jmp .b774
+.774r:
+	push -774
+	call .nextup
+	push "Anti-antimatter: Baryon Asymmetry is 100%.\n"
+	call print
+	push "       7 quarks.\n"
+	call print
+
+.b774:
+	;; my beautiful ordering is ruined!
+	;; but that's what happens when you don't plan.
+	retrieve 773
+	jz .findisplay
+	retrieve 771
+	jz .773r
+	jmp .findisplay
+.773r:
+	push -773
+	call .nextup
+	push "Inflationary Epoch: Universal Expansion is 0.5.\n"
+	call print
+	push "       20 quarks.\n"
+	call print
+
+
+.findisplay:
+	push "(0) Go back.\n"
 	call print	
 
 	readi 257
@@ -228,10 +391,6 @@ upgrades:
 
 
 .yes:
-	;; stack:
-	;; d259 - x = user input
-	;; user input
-	;; ???
 	drop ;; don't need two copies
 	push -769
 .loop2:
@@ -255,7 +414,29 @@ upgrades:
 	sub
 	jz .buy770
 
-	;; ...
+	dup
+	push -771
+	sub
+	jz .buy771
+
+	dup
+	push -772
+	sub
+	jz .buy772
+
+	dup
+	push -773
+	sub
+	jz .buy773
+
+	dup
+	push -774
+	sub
+	jz .buy774
+
+	push "Error: Invalid upgrade number.\n"
+	call print
+	end
 
 .buy769:
 	call .clearup
@@ -298,8 +479,109 @@ upgrades:
 	push 0
 	store
 	push 261
+	push 100
+	store
+	
+	push "Upgrade bought.\n"
+	call print
+	jmp upgrades
+
+.buy771:
+	call .clearup
+	drop
+	drop
+	retrieve 1
+	push 1
+	sub ;; quarks - 1
+	dup
+	jn .notenough
+	push 1
+	swap
+	store
+	push 771
+	push 0
+	store
+	push 262
+	push 90
+	store
+	
+	push "Upgrade bought.\n"
+	call print
+	jmp upgrades
+
+.buy772:
+	call .clearup
+	drop
+	drop
+	retrieve 2
+	push 150
+	sub ;; heat - 150
+	jn .notenough
+	retrieve 1
+	push 3
+	sub ;; quarks - 3
+	dup
+	jn .notenough
+	push 1
+	swap
+	store
+	push 2
+	swap
+	store
+	push 772
+	push 0
+	store
+	push 261
+	push 200
+	store
+	
+	push "Upgrade bought.\n"
+	call print
+	jmp upgrades
+	
+
+.buy773:
+	call .clearup
+	drop
+	drop
+	retrieve 1
+	push 20
+	sub ;; quarks - 20
+	dup
+	jn .notenough
+	push 1
+	swap
+	store
+	push 773
+	push 0
+	store
+	push 262
 	push 50
 	store
+	
+	push "Upgrade bought.\n"
+	call print
+	jmp upgrades
+
+.buy774:
+	call .clearup
+	drop
+	drop
+	retrieve 1
+	push 7
+	sub ;; quarks - 7
+	dup
+	jn .notenough
+	push 1
+	swap
+	store
+	push 774
+	push 0
+	store
+	push 261
+	push 1000
+	store
+	
 	push "Upgrade bought.\n"
 	call print
 	jmp upgrades
@@ -328,7 +610,7 @@ upgrades:
 	push 1
 	sub
 	dup
-	push -771
+	push -775
 	sub
 	jz .clearup.done
 	jmp .clearup.loop
@@ -364,7 +646,7 @@ upgrades:
 
 createquark:
 	retrieve 2
-	push 99
+	retrieve 262
 	mul
 	push 100
 	div
@@ -405,10 +687,27 @@ createquark:
 	push 1
 	add
 	store ;; add 1 to beginner flag
+	push "You created a quark, but\n"
+	call print
+	push "an anti-quark was also created,\n"
+	call print
+	push "which annihilated your quark.\n"
+	call print
+	push "The universe feels warmer...\n"
+	call print
+	retrieve 2
+	push 10
+	add
+	push 2
+	swap
+	store
+	jmp quarks
 .fail:
 	retrieve 513
 	jz .exp
-	push "An anti-quark was created,\n"
+	push "You created a quark, but\n"
+	call print
+	push "an anti-quark was also created,\n"
 	call print
 	push "which annihilated your quark.\n"
 	call print
