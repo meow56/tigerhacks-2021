@@ -1,0 +1,157 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;     It's all so empty...      ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Heap layout:                  ;;
+;; 1-256 are used for variables. ;;
+;; 1 is quarks.                  ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; 257+ are used for internals.  ;;
+;; 257 is used for stdin.        ;;
+;; 258 is the seed of the RNG.   ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+;; Setup
+	push 1 ;; quarks
+	push 0
+	store
+
+	;; RNG is seeded by player input.
+	;; See the end of the intro.
+
+;; Intro
+	push "You are nothing.\n"
+	call print
+
+	push "But you could be something.\n"
+	call print
+
+	push "What shall you be?\n"
+	call print
+	push 0 ;; accumulator
+
+loop:
+	readc 257
+	retrieve 257
+	dup
+	push '\n'
+	sub ;; check if \n
+	jz .done
+	;; not done.
+	add ;; accum + current value
+	jmp loop
+
+.done:
+	drop ;; drop \n
+	push 134456
+	mod ;; make sure it's in our bounds
+	push 258
+	swap
+	store ;; RNG seeded.
+	
+	push "You are something.\n"
+	call print
+
+quarks:
+	push "You have "
+	call print
+	retrieve 1
+	printi
+	push " quarks.\n"
+	call print
+	
+		
+
+	push "Create a (q)uark.\n"
+	call print
+
+	readc 257
+	retrieve 257
+	readc 257 ;; drop \n
+	
+	dup
+	push 'q'
+	sub
+	jz createquark
+	
+	dup
+	push 'Q'
+	sub
+	jz createquark
+	jmp quarks
+
+
+createquark:
+	drop
+	call random
+	retrieve 258
+	push 1000
+	mod
+	push 50 ;; 5% chance of non-annihilation
+	swap
+	sub ;; 50 - RNG
+	jn .fail
+	jz .fail
+
+	push 1
+	retrieve 1
+	push 1
+	add
+	store
+	jmp quarks
+	end
+
+.fail:
+	end
+
+print:
+	dup
+	jz .done
+	printc
+	jmp print
+.done:
+	drop
+	ret
+
+lessthan:
+	;; Pushes 1 to the stack if the top
+	;; stack element is less than the second
+	;; stack element, or 0 otherwise.
+	;; Retains the elements.
+	dup ;; copies the first
+	copy 3 ;; copies the second
+	sub
+	jn .neg
+	drop
+	push 0
+	ret
+.neg:
+	;; first less than second
+	drop
+	push 1
+	ret
+
+random:
+	;; Updates a "random number" (heap 258)
+	;; using a linear congruential generator
+	;; with a = 8121, c = 28411, m = 134456.
+	;; these numbers were chosen
+	;; since they're small. I took them
+	;; from the Wikipedia page on LCGs.
+	;; I guess they were used by MATLAB?
+	;; LCGs are obviously not very random,
+	;; but it's easy to implement.
+	push 258
+	retrieve 258
+	push 8121
+	mul
+	push 28411
+	add
+	push 134456
+	mod
+	store
+	ret
+
+saferead:
+	;; Like a regular read, but
+	;; consumes everything up to \n.
