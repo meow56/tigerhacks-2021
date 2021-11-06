@@ -4,16 +4,20 @@
 ;; Heap layout:                  ;;
 ;; 1-256 are used for variables. ;;
 ;; 1 is quarks.                  ;;
-;; 2 is energy.                  ;;
+;; 2 is heat.                    ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; 257-512 are for internals.    ;;
 ;; 257 is used for stdin.        ;;
 ;; 258 is the seed of the RNG.   ;;
 ;; 259 is a temp variable.       ;;
+;; 260 is number of quarks/heat  ;;
+;;     on quark creation.        ;;
+;; 261 is chance to avoid quark  ;;
+;;     annihilation * 10.        ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; 513-768 are for flags.        ;;
 ;; 513 is the upgrade flag.      ;;
-;;   (unlock at 10 energy)       ;;
+;;   (unlock at 10 heat)         ;;
 ;; 514 is the beginner flag.     ;;
 ;;   (forces annihilation        ;;
 ;;    for first five quarks)     ;;
@@ -22,7 +26,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; 769-1024 are for upgrades.    ;;
 ;; 769 is double gain.           ;;
-;;   (Double quark/energy gain.) ;;
+;;   (Double quark/heat gain.)   ;;
 ;; 770 is chance increase.       ;;
 ;;   (Increase non-annihilation  ;;
 ;;    chance by 5%.)             ;;
@@ -34,12 +38,20 @@
 	push 0
 	store
 
-	push 2 ;; energy
+	push 2 ;; heat
 	push 0
 	store
 
 	;; RNG is seeded by player input.
 	;; See the end of the intro.
+
+	push 260 ;; amount on creation
+	push 1
+	store
+	
+	push 261 ;; avoid annihilation chance
+	push 0
+	store
 
 	push 513 ;; upgrade flag
 	push 1
@@ -47,6 +59,14 @@
 
 	push 514 ;; beginner flag
 	push -5
+	store
+
+	push 769 ;; gain upgrade
+	push 1
+	store
+	
+	push 770 ;; chance upgrade
+	push 1
 	store
 
 ;; Intro
@@ -92,8 +112,14 @@ quarks:
 	push " quarks and "
 	call print
 	retrieve 2
+	push 10
+	div
 	printi
-	push " energy.\n"
+	push " heat.\n"
+	call print
+	push "Universal expansion is causing\n"
+	call print
+	push "your heat to be multiplied by 0.99 every turn.\n"
 	call print
 	jmp .merge
 
@@ -118,9 +144,7 @@ quarks:
 
 
 .input:
-	readc 257
-	retrieve 257
-	readc 257 ;; drop \n
+	call safereadc
 	
 	dup
 	push 'q'
@@ -133,32 +157,220 @@ quarks:
 	jz createquark
 
 	retrieve 513
-	jz .finish
-	
+	jz .notdone
+	jmp .finish
+.notdone:	
 	dup
 	push 'u'
 	sub
-	jz upgrades
+	jz .toupgrades
 	
 	dup
 	push 'U'
 	sub
-	jz upgrades
+	jz .toupgrades
 
 .finish:
 	jmp quarks
+
+.toupgrades:
+	drop
+	jmp upgrades
 
 upgrades:
 	push "Current upgrades:\n"
 	call print
 	push 259
-	push 2 ;; upgrades
+	push 1 ;; upgrades
 	store
-	push "(1) "
+	retrieve 769
+	jz .b769
+	push -769
+	call .nextup
+	push "Double Up: You get double the quarks/heat on quark creation.\n"
 	call print
+	push "       15 heat.\n"
+	call print
+
+.b769:
+	retrieve 770
+	jz .b770
+	push -770
+	call .nextup
+	push "Baryon Asymmetry: Your quarks have a chance to avoid annihilation. (0% -> 5%)\n"
+	call print
+	push "       25 heat.\n"
+	call print
+
+.b770:
 	
+	
+	push "(0) Return to main.\n"
+	call print	
+
+	readi 257
+	retrieve 257
+
+	dup
+	jz .return
+
+	retrieve 259
+.loop:
+	push 1
+	sub ;; d259 - 1
+	dup
+	jz .done
+	copy 1 ;; copy input
+	copy 1 ;; copy d259 - 1
+	sub ;; input - (d259 - 1)
+	jz .yes
+	jmp .loop
+
+
+.yes:
+	;; stack:
+	;; d259 - x = user input
+	;; user input
+	;; ???
+	drop ;; don't need two copies
+	push -769
+.loop2:
+	dup
+	retrieve
+	copy 2 ;; copy user input
+	sub ;; in - 0d(-7XX)
+	jz .same
+	push -1
+	add ;; -7XX - 1
+	jmp .loop2
+
+.same:
+	dup
+	push -769
+	sub
+	jz .buy769
+	
+	dup
+	push -770
+	sub
+	jz .buy770
+
+	;; ...
+
+.buy769:
+	call .clearup
+	drop
+	drop
+	retrieve 2
+	push 150
+	sub ;; heat - 150
+	dup
+	jn .notenough
+	push 2
+	swap
+	store
+	push 769
+	push 0
+	store
+	push 260
+	retrieve 260
+	push 2
+	mul
+	store
+	
+	push "Upgrade bought.\n"
+	call print
+	jmp upgrades
+	
+.buy770:
+	call .clearup
+	drop
+	drop
+	retrieve 2
+	push 250
+	sub ;; heat - 250
+	dup
+	jn .notenough
+	push 2
+	swap
+	store
+	push 770
+	push 0
+	store
+	push 261
+	push 50
+	store
+	push "Upgrade bought.\n"
+	call print
+	jmp upgrades
+
+.notenough:
+	drop
+	push "Can't afford upgrade.\n"
+	call print
+	jmp upgrades
+
+.done:
+	;; not valid.
+	drop
+	jmp upgrades
+
+.return:
+	drop
+	jmp quarks
+	
+.clearup:
+	push -769
+.clearup.loop:
+	dup
+	push 0
+	store
+	push 1
+	sub
+	dup
+	push -771
+	sub
+	jz .clearup.done
+	jmp .clearup.loop
+.clearup.done:
+	drop
+	ret
+
+.nextup:
+	;; prints "(1) " on first call,
+	;;        "(2) " on second call,
+	;;        "(3) " on third call,
+	;; etc.
+	;; also sets -(upgrade num) to be
+	;; the printed number.
+	;; push the number on the stack
+	;; before calling.
+	retrieve 259
+	store
+	push '('
+	printc
+	push 259
+	retrieve 259
+	dup
+	printi
+	push 1
+	add
+	store
+	push ')'
+	printc
+	push ' '
+	printc
+	ret
 
 createquark:
+	retrieve 2
+	push 99
+	mul
+	push 100
+	div
+	push 2
+	swap
+	store
 	drop
 	retrieve 514
 	jn .begfail ;; beginner
@@ -166,17 +378,24 @@ createquark:
 	retrieve 258
 	push 1000
 	mod
-	push 50 ;; 5% chance of non-annihilation
+	retrieve 261 ;; non-annihilation chance
 	swap
 	sub ;; 50 - RNG
+	push 1
+	sub ;; -1 to avoid RNG = 0 shenanigans
 	jn .fail
 
-	push "You obtained 1 quark.\n"
+	push "You obtained "
 	call print
-	push 1
+	retrieve 260
+	dup
+	printi
+	push " quark(s).\n"
+	call print
 	retrieve 1
-	push 1
 	add
+	push 1
+	swap
 	store
 	jmp quarks
 
@@ -195,23 +414,30 @@ createquark:
 	call print
 
 .exp:
-	push "You obtained 1 energy.\n"
+	push "You obtained "
+	call print
+	retrieve 260
+	dup
+	printi
+	push 10
+	mul
+	push " heat.\n"
 	call print
 	retrieve 2
 	dup
-	push 9
-	sub ;; energy - 9
+	push 90
+	sub ;; heat - 90
 	jn .noupgr
 	push 513
 	push 0
 	store ;; set upgrade flag
 .noupgr:
-	push 1
 	add
 	push 2
 	swap
 	store
 	jmp quarks
+
 
 
 print:
@@ -262,6 +488,44 @@ random:
 	store
 	ret
 
-saferead:
-	;; Like a regular read, but
+safereadc:
+	;; Like a regular readc, but
 	;; consumes everything up to \n.
+	;; Returns the first character.
+	retrieve 259 ;; pop 259...
+	push 259
+	push 10
+	store
+
+.loop:
+	readc 257
+	retrieve 257
+	dup
+	push '\n'
+	sub
+	jz .islf
+	retrieve 259
+	push 10
+	sub
+	jz .first
+	drop
+	jmp .loop
+
+.islf:
+	drop
+	retrieve 259
+	dup
+	push 10
+	sub
+	jz .loop
+	push 259
+	copy 2
+	store ;; ...push 259.
+	slide 1 ;; slide off the pop
+	ret
+
+.first:
+	push 259
+	swap
+	store
+	jmp .loop
