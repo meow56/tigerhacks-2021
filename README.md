@@ -1,2 +1,2 @@
-# tigerhacks-2021
-project for tigerhacks 2021
+# TigerHacks-2021
+This is my submission for TigerHacks 2021.
