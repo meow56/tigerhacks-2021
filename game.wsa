@@ -4,10 +4,28 @@
 ;; Heap layout:                  ;;
 ;; 1-256 are used for variables. ;;
 ;; 1 is quarks.                  ;;
+;; 2 is energy.                  ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; 257+ are used for internals.  ;;
+;; 257-512 are for internals.    ;;
 ;; 257 is used for stdin.        ;;
 ;; 258 is the seed of the RNG.   ;;
+;; 259 is a temp variable.       ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; 513-768 are for flags.        ;;
+;; 513 is the upgrade flag.      ;;
+;;   (unlock at 10 energy)       ;;
+;; 514 is the beginner flag.     ;;
+;;   (forces annihilation        ;;
+;;    for first five quarks)     ;;
+;; 515 is hide bought flag.      ;;
+;;   (hides bought upgrades)     ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; 769-1024 are for upgrades.    ;;
+;; 769 is double gain.           ;;
+;;   (Double quark/energy gain.) ;;
+;; 770 is chance increase.       ;;
+;;   (Increase non-annihilation  ;;
+;;    chance by 5%.)             ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
@@ -16,8 +34,20 @@
 	push 0
 	store
 
+	push 2 ;; energy
+	push 0
+	store
+
 	;; RNG is seeded by player input.
 	;; See the end of the intro.
+
+	push 513 ;; upgrade flag
+	push 1
+	store
+
+	push 514 ;; beginner flag
+	push -5
+	store
 
 ;; Intro
 	push "You are nothing.\n"
@@ -49,10 +79,25 @@ loop:
 	swap
 	store ;; RNG seeded.
 	
-	push "You are something.\n"
+	push "So it shall be.\n\n\n"
 	call print
 
 quarks:
+	retrieve 2
+	jz .noeng
+	push "You have "
+	call print
+	retrieve 1
+	printi
+	push " quarks and "
+	call print
+	retrieve 2
+	printi
+	push " energy.\n"
+	call print
+	jmp .merge
+
+.noeng:
 	push "You have "
 	call print
 	retrieve 1
@@ -60,11 +105,19 @@ quarks:
 	push " quarks.\n"
 	call print
 	
-		
-
+.merge:
+	retrieve 513
+	jz .upgr
 	push "Create a (q)uark.\n"
 	call print
+	jmp .input
 
+.upgr:
+	push "Create a (q)uark, or check the (u)pgrades.\n"
+	call print
+
+
+.input:
 	readc 257
 	retrieve 257
 	readc 257 ;; drop \n
@@ -78,11 +131,37 @@ quarks:
 	push 'Q'
 	sub
 	jz createquark
+
+	retrieve 513
+	jz .finish
+	
+	dup
+	push 'u'
+	sub
+	jz upgrades
+	
+	dup
+	push 'U'
+	sub
+	jz upgrades
+
+.finish:
 	jmp quarks
 
+upgrades:
+	push "Current upgrades:\n"
+	call print
+	push 259
+	push 2 ;; upgrades
+	store
+	push "(1) "
+	call print
+	
 
 createquark:
 	drop
+	retrieve 514
+	jn .begfail ;; beginner
 	call random
 	retrieve 258
 	push 1000
@@ -91,18 +170,49 @@ createquark:
 	swap
 	sub ;; 50 - RNG
 	jn .fail
-	jz .fail
 
+	push "You obtained 1 quark.\n"
+	call print
 	push 1
 	retrieve 1
 	push 1
 	add
 	store
 	jmp quarks
-	end
 
+.begfail:
+	push 514
+	retrieve 514
+	push 1
+	add
+	store ;; add 1 to beginner flag
 .fail:
-	end
+	retrieve 513
+	jz .exp
+	push "An anti-quark was created,\n"
+	call print
+	push "which annihilated your quark.\n"
+	call print
+
+.exp:
+	push "You obtained 1 energy.\n"
+	call print
+	retrieve 2
+	dup
+	push 9
+	sub ;; energy - 9
+	jn .noupgr
+	push 513
+	push 0
+	store ;; set upgrade flag
+.noupgr:
+	push 1
+	add
+	push 2
+	swap
+	store
+	jmp quarks
+
 
 print:
 	dup
