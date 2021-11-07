@@ -830,7 +830,7 @@ baryons:
 	sub
 	jn .skipneutrons
 
-	push "Fuse all of your quarks and quark generators (except a single gen 1) into 1 neutron.\n"
+	push "Fuse all of your quarks and quark generators (except a single gen 1) into 1 (n)eutron.\n"
 	call print
 .skipneutrons:
 	push "Check the (g)enerators tab.\n"
@@ -895,7 +895,7 @@ createneutron:
 	push 0
 	store
 	push 264
-	push 0
+	push 1
 	store
 	push 266
 	push 0
