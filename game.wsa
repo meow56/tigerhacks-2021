@@ -5,6 +5,7 @@
 ;; 1-256 are used for variables. ;;
 ;; 1 is quarks.                  ;;
 ;; 2 is heat.                    ;;
+;; 3 is neutrons.                ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; 257-512 are for internals.    ;;
 ;; 257 is used for stdin.        ;;
@@ -16,6 +17,22 @@
 ;;     annihilation * 10.        ;;
 ;; 262 is universal expansion    ;;
 ;;     * 100.                    ;;
+;; 263 is quarks/second.         ;;
+;; 264 is total q-generator Is.  ;;
+;; 265 is q-gen I multiplier     ;;
+;;     * 100.                    ;;
+;; 266 is total q-generator IIs. ;;
+;; 267 is q-gen II multiplier    ;;
+;;     * 100.                    ;;
+;; 268 is total q-generator III. ;;
+;; 269 is q-gen III multiplier   ;;
+;;     * 100.                    ;;
+;; 270 is q-gen IV multiplier    ;;
+;;     * 100.                    ;;
+;; 271 is q-gen I cost           ;;
+;; 272 is q-gen II cost          ;;
+;; 273 is q-gen III cost         ;;
+;; 274 is q-gen IV cost          ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; 513-768 are for flags.        ;;
 ;; 513 is the upgrade flag.      ;;
@@ -28,7 +45,8 @@
 ;; 516 is the move on flag.      ;;
 ;;   (says we're ready to go!)   ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; 769-1024 are for upgrades.    ;;
+;; 769-1024 are for upgrades     ;;
+;;    and generators.            ;;
 ;; 769 is double gain.           ;;
 ;;   (Double quark/heat gain.)   ;;
 ;; 770 is chance increase.       ;;
@@ -46,6 +64,14 @@
 ;; 774 is chance increase III.   ;;
 ;;   (Increase non-annihilation  ;;
 ;;    chance to 50%.)            ;;
+;; 775 is bought quark           ;;
+;;    generator I.               ;;
+;; 776 is bought quark           ;;
+;;    generator II.              ;;
+;; 777 is bought quark           ;;
+;;    generator III.             ;;
+;; 778 is bought quark           ;;
+;;    generator IV.              ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
@@ -71,6 +97,38 @@
 
 	push 262 ;; universal expansion
 	push 99
+	store
+
+	push 265 ;; gen I mult
+	push 100
+	store
+
+	push 267 ;; gen II mult
+	push 100
+	store
+
+	push 269 ;; gen III mult
+	push 100
+	store
+
+	push 270 ;; gen IV mult
+	push 100
+	store
+	
+	push 271 ;; gen I cost
+	push 1
+	store
+	
+	push 272 ;; gen II cost
+	push 100
+	store
+	
+	push 273 ;; gen III cost
+	push 100000
+	store
+	
+	push 274 ;; gen IV cost
+	push 1000000000
 	store
 
 	push 513 ;; upgrade flag
@@ -192,12 +250,12 @@ quarks:
 	jmp .input
 
 .notemoveon:
-	push 49
+	push 29
 	retrieve 1
-	sub ;; 49 - quarks
+	sub ;; 29 - quarks
 	jn .enoughquarks
 	
-	push "***Move on: Have 50 quarks and no heat.***\n"
+	push "***Move on: Have 30 quarks and no heat.***\n"
 	call print
 	jmp .input
 
@@ -215,7 +273,7 @@ quarks:
 	jmp .input
 
 .notenoughcool:
-	push "***Move on: Have 50 quarks and no heat.***\n"
+	push "***Move on: Have 30 quarks and no heat.***\n"
 	call print
 	jmp .input
 
@@ -264,10 +322,13 @@ quarks:
 	jmp quarks
 
 .moveon:
-	push "This is the end of content, for now.\n"
+	push "It seems the universe is cool.\n"
 	call print
-	push "Thanks for playing!\n"
+	push "Perhaps you can make something greater with\n"
 	call print
+	push "what you have collected.\n"
+	call print
+	jmp baryons
 	end
 
 .toupgrades:
@@ -516,6 +577,7 @@ upgrades:
 	retrieve 2
 	push 150
 	sub ;; heat - 150
+	dup
 	jn .notenough
 	retrieve 1
 	push 3
@@ -738,6 +800,499 @@ createquark:
 	jmp quarks
 
 
+baryons:
+	retrieve 3
+	jz .noneutrons
+	push "You have "
+	call print
+	retrieve 1
+	printi
+	push " quarks and "
+	call print
+	retrieve 3
+	printi
+	push " neutrons.\n"
+	call print
+	push "Obtain 4 neutrons to win the game.\n"
+	call print
+	
+.noneutrons:
+	push "You have "
+	call print
+	retrieve 1
+	printi
+	push " quarks.\n"
+	call print
+	
+.merge:
+	retrieve 1
+	push 100000000000
+	sub
+	jn .skipneutrons
+
+	push "Fuse all of your quarks and quark generators (except a single gen 1) into 1 neutron.\n"
+	call print
+.skipneutrons:
+	push "Check the (g)enerators tab.\n"
+	call print
+	push "Or (w)ait for your generators.\n"
+	call print
+	
+.input:
+	call safereadc
+
+	retrieve 775
+	jz .inskipneutrons
+	
+	dup
+	push 'n'
+	sub
+	jz createneutron
+
+	dup
+	push 'N'
+	sub
+	jz createneutron
+.inskipneutrons:
+	dup
+	push 'g'
+	sub
+	jz generators
+
+	dup
+	push 'G'
+	sub
+	jz generators
+
+	dup
+	push 'w'
+	sub
+	jz .wait
+	
+	dup
+	push 'W'
+	sub
+	jz .wait
+
+	jmp .input
+
+.wait:
+	call tick
+	jmp baryons
+
+createneutron:
+	retrieve 3
+	push 1
+	add
+	dup
+	push 4
+	sub
+	jz beatgame
+	push 3
+	swap
+	store
+	push 1
+	push 0
+	store
+	push 264
+	push 0
+	store
+	push 266
+	push 0
+	store
+	push 268
+	push 0
+	store
+	push 265
+	push 100
+	store
+	push 267
+	push 100
+	store
+	push 269
+	push 100
+	store
+	push 271
+	push 100
+	store
+	push 272
+	push 100
+	store
+	push 273
+	push 100000
+	store
+	push 274
+	push 1000000000
+	store
+	push 775
+	push 1
+	store
+	push 776
+	push 0
+	store
+	push 777
+	push 0
+	store
+	push 778
+	push 0
+	store
+	jmp baryons
+
+beatgame:
+	push "As you watch your four neutrons, suddenly\n"
+	call print
+	push "two of them undergo beta decay, forming a proton and electron each.\n"
+	call print
+	push "Delightfully, the two remaining neutrons combine with the decay results\n"
+	call print
+	push "to form a Helium atom. From here, a new universe will take shape...\n"
+	call print
+	push "And it's all thanks to your hard work. Good job!\n"
+	call print
+	push "Thanks for playing!!!\n"
+	call print
+	push "I will likely continue working on this project after the deadline passes...\n"
+	call print
+	push "But right now I'm sleep-deprived and making way too many little errors to function.\n"
+	call print
+	push "So this is where it ends!\n"
+	call print
+	push "Once again, thanks for playing!\n"
+	call print
+	end
+
+tick:
+	retrieve 778
+	retrieve 270
+	mul
+	push 100
+	div
+	retrieve 268
+	add
+	push 268
+	swap
+	store
+	retrieve 268
+	retrieve 269
+	mul
+	push 100
+	div
+	retrieve 266
+	add
+	push 266
+	swap
+	store
+	retrieve 266
+	retrieve 267
+	mul
+	push 100
+	div
+	retrieve 264
+	add
+	push 264
+	swap
+	store
+	retrieve 264
+	retrieve 265
+	mul
+	push 100
+	div
+	push 263
+	swap
+	store
+	retrieve 1
+	retrieve 263
+	add
+	push 1
+	swap
+	store
+	ret
+
+generators:
+	push "Your quark generators are currently producing\n"
+	call print
+	retrieve 263
+	printi
+	push " quarks per tick.\n"
+	call print
+
+	push "(1) Quark Generator I: "
+	call print
+	retrieve 264
+	printi
+	push " ["
+	call print
+	retrieve 775
+	printi
+	push "]\n"
+	call print
+
+	push "    Cost: "
+	call print
+	retrieve 271
+	printi
+	push " quarks\n"
+	call print
+	
+	retrieve 775
+	push 1
+	sub
+	jn .finish
+	
+	push "(2) Quark Generator II: "
+	call print
+	retrieve 266
+	printi
+	push " ["
+	call print
+	retrieve 776
+	printi
+	push "]\n"
+	call print
+	push "    Cost: "
+	call print
+	retrieve 272
+	printi
+	push " quarks\n"
+	call print
+
+	retrieve 776
+	push 1
+	sub
+	jn .finish
+	
+	push "(3) Quark Generator III: "
+	call print
+	retrieve 268
+	printi
+	push " ["
+	call print
+	retrieve 777
+	printi
+	push "]\n"
+	call print
+	push "    Cost: "
+	call print
+	retrieve 273
+	printi
+	push " quarks\n"
+	call print
+	
+	retrieve 777
+	push 1
+	sub
+	jn .finish
+
+	push "(4) Quark Generator IV: "
+	call print
+	retrieve 778
+	printi
+	push " ["
+	call print
+	retrieve 778
+	printi
+	push "]\n"
+	call print
+	push "    Cost: "
+	call print
+	retrieve 274
+	printi
+	push " quarks\n"
+	call print
+
+.finish:
+	push "(0) Back.\n"
+	call print
+.input:
+	readi 257
+	retrieve 257
+	
+	dup
+	jz .return
+	
+	dup
+	push 1
+	sub
+	jz .buyq1
+	
+	retrieve 775
+	push 1
+	sub
+	jn .input
+	
+	dup
+	push 2
+	sub
+	jz .buyq2
+	
+	retrieve 776
+	push 1
+	sub
+	jn .input
+	
+	dup
+	push 3
+	sub
+	jz .buyq3
+	
+	retrieve 777
+	push 1
+	sub
+	jn .input
+	
+	dup
+	push 4
+	sub
+	jz .buyq4
+	
+	jmp .input
+	
+.return:
+	jmp baryons
+	
+.buyq1:
+	retrieve 1
+	retrieve 271
+	sub ;; num - cost
+	dup
+	jn .cantafford
+	call tick
+	push 1
+	swap
+	store
+	retrieve 265
+	push 2
+	mul
+	push 265
+	swap
+	store
+	retrieve 264
+	push 1
+	add
+	push 264
+	swap
+	store
+	retrieve 271
+	push 100
+	mul
+	push 271
+	swap
+	store
+	retrieve 775
+	push 1
+	add
+	push 775
+	swap
+	store
+	jmp generators
+	
+.buyq2:
+	retrieve 1
+	retrieve 272
+	sub ;; num - cost
+	dup
+	jn .cantafford
+	call tick
+	push 1
+	swap
+	store
+	retrieve 267
+	push 2
+	mul
+	push 267
+	swap
+	store
+	retrieve 266
+	push 1
+	add
+	push 266
+	swap
+	store
+	retrieve 272
+	push 100
+	mul
+	push 272
+	swap
+	store
+	retrieve 776
+	push 1
+	add
+	push 776
+	swap
+	store
+	jmp generators
+	
+.buyq3:
+	retrieve 1
+	retrieve 273
+	sub ;; num - cost
+	dup
+	jn .cantafford
+	call tick
+	push 1
+	swap
+	store
+	retrieve 269
+	push 2
+	mul
+	push 269
+	swap
+	store
+	retrieve 268
+	push 1
+	add
+	push 268
+	swap
+	store
+	retrieve 273
+	push 100
+	mul
+	push 273
+	swap
+	store
+	retrieve 777
+	push 1
+	add
+	push 777
+	swap
+	store
+	jmp generators
+	
+	
+.buyq4:
+	retrieve 1
+	retrieve 274
+	sub ;; num - cost
+	dup
+	jn .cantafford
+	call tick
+	push 1
+	swap
+	store
+	retrieve 270
+	push 2
+	mul
+	push 270
+	swap
+	store
+	retrieve 274
+	push 100
+	mul
+	push 274
+	swap
+	store
+	retrieve 778
+	push 1
+	add
+	push 778
+	swap
+	store
+	jmp generators
+	
+.cantafford:
+	push "Can't afford generator.\n"
+	call print
+	jmp generators
 
 print:
 	dup
